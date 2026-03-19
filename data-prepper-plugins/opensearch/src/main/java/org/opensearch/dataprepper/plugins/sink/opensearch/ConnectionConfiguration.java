@@ -5,8 +5,10 @@
 
 package org.opensearch.dataprepper.plugins.sink.opensearch;
 
+import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequestInterceptor;
+import org.apache.http.message.BasicHeader;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
@@ -95,6 +97,8 @@ public class ConnectionConfiguration {
   private final String awsStsExternalId;
   private final Map<String, String> awsStsHeaderOverrides;
   private final Optional<String> proxy;
+  private final String pathPrefix;
+  private final Map<String, String> requestHeaders;
   private final boolean serverless;
   private final String serverlessNetworkPolicyName;
   private final String serverlessCollectionName;
@@ -136,6 +140,14 @@ public class ConnectionConfiguration {
 
   Optional<String> getProxy() {
     return proxy;
+  }
+
+  String getPathPrefix() {
+    return pathPrefix;
+  }
+
+  Map<String, String> getRequestHeaders() {
+    return requestHeaders;
   }
 
   Integer getSocketTimeout() {
@@ -185,6 +197,8 @@ public class ConnectionConfiguration {
     this.awsStsExternalId = builder.awsStsExternalId;
     this.awsStsHeaderOverrides = builder.awsStsHeaderOverrides;
     this.proxy = builder.proxy;
+    this.pathPrefix = builder.pathPrefix;
+    this.requestHeaders = builder.requestHeaders;
     this.serverless = builder.serverless;
     this.serverlessNetworkPolicyName = builder.serverlessNetworkPolicyName;
     this.serverlessCollectionName = builder.serverlessCollectionName;
@@ -270,6 +284,16 @@ public class ConnectionConfiguration {
       builder = builder.withProxy(proxy);
     }
 
+    final String pathPrefix = openSearchSinkConfig.getPathPrefix();
+    if (pathPrefix != null) {
+      builder = builder.withPathPrefix(pathPrefix);
+    }
+
+    final Map<String, String> requestHeaders = openSearchSinkConfig.getRequestHeaders();
+    if (requestHeaders != null && !requestHeaders.isEmpty()) {
+      builder = builder.withRequestHeaders(requestHeaders);
+    }
+
     final boolean requestCompressionEnabled = openSearchSinkConfig.getEnableRequestCompression();
     builder = builder.withRequestCompressionEnabled(requestCompressionEnabled);
 
@@ -285,6 +309,10 @@ public class ConnectionConfiguration {
       i++;
     }
     final RestClientBuilder restClientBuilder = RestClient.builder(httpHosts);
+    if (pathPrefix != null) {
+      restClientBuilder.setPathPrefix(pathPrefix);
+    }
+    setDefaultRequestHeaders(restClientBuilder);
     /*
      * Given that this is a patch release, we will support only the IAM based access policy AES domains.
      * We will not support FGAC and Custom endpoint domains. This will be followed in the next version.
@@ -377,6 +405,15 @@ public class ConnectionConfiguration {
     );
   }
 
+  private void setDefaultRequestHeaders(final RestClientBuilder restClientBuilder) {
+    if (requestHeaders != null && !requestHeaders.isEmpty()) {
+      final Header[] defaultHeaders = requestHeaders.entrySet().stream()
+              .map(entry -> new BasicHeader(entry.getKey(), entry.getValue()))
+              .toArray(Header[]::new);
+      restClientBuilder.setDefaultHeaders(defaultHeaders);
+    }
+  }
+
   private void checkProxyPort(final int port) {
     if (!VALID_PORT_RANGE.isValidIntValue(port)) {
       throw new IllegalArgumentException("Invalid or missing proxy port.");
@@ -447,6 +484,12 @@ public class ConnectionConfiguration {
       if (!isRequestCompressionEnabled()) {
         // Disable compression for all requests
         transportOptions.setRequestCompressionSize(Integer.MAX_VALUE);
+      }
+
+      if (requestHeaders != null) {
+        for (Map.Entry<String, String> entry : requestHeaders.entrySet()) {
+          transportOptions.addHeader(entry.getKey(), entry.getValue());
+        }
       }
 
       return new AwsSdk2Transport(createSdkHttpClient(), HttpHost.create(hosts.get(0)).toHostString(),
@@ -529,6 +572,8 @@ public class ConnectionConfiguration {
     private String awsStsExternalId;
     private Map<String, String> awsStsHeaderOverrides;
     private Optional<String> proxy = Optional.empty();
+    private String pathPrefix;
+    private Map<String, String> requestHeaders;
     private String pipelineName;
     private boolean serverless;
     private String serverlessNetworkPolicyName;
@@ -638,6 +683,18 @@ public class ConnectionConfiguration {
 
     public Builder withProxy(final String proxy) {
       this.proxy = Optional.ofNullable(proxy);
+      return this;
+    }
+
+    public Builder withPathPrefix(final String pathPrefix) {
+      checkArgument(pathPrefix != null, "pathPrefix cannot be null");
+      this.pathPrefix = pathPrefix;
+      return this;
+    }
+
+    public Builder withRequestHeaders(final Map<String, String> requestHeaders) {
+      checkArgument(requestHeaders != null, "requestHeaders cannot be null");
+      this.requestHeaders = requestHeaders;
       return this;
     }
 

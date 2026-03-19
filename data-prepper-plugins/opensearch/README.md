@@ -101,6 +101,29 @@ pipeline:
       bulk_size: 4
 ```
 
+### Reverse Proxy
+
+When OpenSearch is behind a reverse proxy (e.g., Nginx, HAProxy, or an API gateway) that exposes it under a sub-path, use `path_prefix` and optionally `request_headers` to route requests correctly.
+
+```
+pipeline:
+  ...
+  sink:
+    opensearch:
+      hosts: ["https://reverse-proxy.example.com:443"]
+      path_prefix: "/opensearch"
+      request_headers:
+        X-Proxy-Auth: "bearer my-token"
+        X-Tenant-Id: "my-tenant"
+      username: YOUR_USERNAME_HERE
+      password: YOUR_PASSWORD_HERE
+      insecure: false
+      index: my-index
+      bulk_size: 4
+```
+
+In this example, all requests are sent to `https://reverse-proxy.example.com:443/opensearch/...` with the specified custom headers included in every request.
+
 ## Configuration
 
 - `hosts`: A list of IP addresses of OpenSearch nodes.
@@ -131,6 +154,15 @@ Default is null.
 - `password`(optional): A String of password used in the [internal users](https://opensearch.org/docs/latest/security-plugin/access-control/users-roles/) of OpenSearch cluster. Default is null.
 
 - `proxy`(optional): A String of the address of a forward HTTP proxy. The format is like "<host-name-or-ip>:\<port\>". Examples: "example.com:8100", "http://example.com:8100", "112.112.112.112:8100". Note: port number cannot be omitted.
+
+- `path_prefix`(optional): A String path prefix to prepend to all HTTP request paths when sending data to OpenSearch. Use this when OpenSearch is behind a reverse proxy that exposes it under a sub-path. For example, if the reverse proxy routes `/opensearch/*` to the OpenSearch cluster, set `path_prefix` to `/opensearch`. Default is null (no prefix).
+
+- `request_headers`(optional): A map of custom HTTP headers to include in every request to OpenSearch. This is useful when a reverse proxy in front of the OpenSearch cluster requires specific headers for routing, authentication, or tenant selection. Default is null (no additional headers). Example:
+  ```yaml
+  request_headers:
+    X-Proxy-Auth: "bearer my-token"
+    X-Tenant-Id: "tenant-1"
+  ```
 
 - `index_type` (optional): a String from the list [`custom`, `trace-analytics-raw`, `trace-analytics-service-map`, `metric-analytics`, `log-analytics`, `management_disabled`], which represents an index type. Defaults to `custom` if `serverless` is `false` in [AWS Configuration](#aws_configuration), otherwise defaults to `management_disabled`. This index_type instructs Sink plugin what type of data it is handling.
 

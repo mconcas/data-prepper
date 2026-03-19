@@ -696,6 +696,117 @@ class ConnectionConfigurationTests {
         assertNotNull(client);
         client.close();
     }
+
+    @Test
+    void testReadConnectionConfiguration_WithPathPrefix() throws JsonProcessingException {
+        final Map<String, Object> metadata = generateConfigurationMetadata(
+                TEST_HOSTS, TEST_USERNAME, TEST_PASSWORD, TEST_CONNECT_TIMEOUT, TEST_SOCKET_TIMEOUT, false, null, null, TEST_CERT_PATH, false);
+        metadata.put("path_prefix", "/opensearch");
+        final OpenSearchSinkConfig openSearchSinkConfig = getOpenSearchSinkConfigByConfigMetadata(metadata);
+        final ConnectionConfiguration connectionConfiguration =
+                ConnectionConfiguration.readConnectionConfiguration(openSearchSinkConfig);
+        assertEquals("/opensearch", connectionConfiguration.getPathPrefix());
+    }
+
+    @Test
+    void testCreateAllClients_WithPathPrefix() throws IOException {
+        final Map<String, Object> metadata = generateConfigurationMetadata(
+                TEST_HOSTS, TEST_USERNAME, TEST_PASSWORD, TEST_CONNECT_TIMEOUT, TEST_SOCKET_TIMEOUT, false, null, null, TEST_CERT_PATH, false);
+        metadata.put("path_prefix", "/opensearch");
+        final OpenSearchSinkConfig openSearchSinkConfig = getOpenSearchSinkConfigByConfigMetadata(metadata);
+        final ConnectionConfiguration connectionConfiguration =
+                ConnectionConfiguration.readConnectionConfiguration(openSearchSinkConfig);
+        assertEquals("/opensearch", connectionConfiguration.getPathPrefix());
+        final RestHighLevelClient client = connectionConfiguration.createClient(awsCredentialsSupplier);
+        assertNotNull(client);
+        assertNotNull(connectionConfiguration.createOpenSearchClient(client, awsCredentialsSupplier));
+        client.close();
+    }
+
+    @Test
+    void testReadConnectionConfiguration_WithRequestHeaders() throws JsonProcessingException {
+        final Map<String, Object> metadata = generateConfigurationMetadata(
+                TEST_HOSTS, TEST_USERNAME, TEST_PASSWORD, TEST_CONNECT_TIMEOUT, TEST_SOCKET_TIMEOUT, false, null, null, TEST_CERT_PATH, false);
+        metadata.put("request_headers", Map.of("X-Custom-Header", "custom-value", "X-Routing", "cluster-1"));
+        final OpenSearchSinkConfig openSearchSinkConfig = getOpenSearchSinkConfigByConfigMetadata(metadata);
+        final ConnectionConfiguration connectionConfiguration =
+                ConnectionConfiguration.readConnectionConfiguration(openSearchSinkConfig);
+        assertNotNull(connectionConfiguration.getRequestHeaders());
+        assertEquals(2, connectionConfiguration.getRequestHeaders().size());
+        assertEquals("custom-value", connectionConfiguration.getRequestHeaders().get("X-Custom-Header"));
+        assertEquals("cluster-1", connectionConfiguration.getRequestHeaders().get("X-Routing"));
+    }
+
+    @Test
+    void testCreateAllClients_WithRequestHeaders() throws IOException {
+        final Map<String, Object> metadata = generateConfigurationMetadata(
+                TEST_HOSTS, TEST_USERNAME, TEST_PASSWORD, TEST_CONNECT_TIMEOUT, TEST_SOCKET_TIMEOUT, false, null, null, TEST_CERT_PATH, false);
+        metadata.put("request_headers", Map.of("X-Proxy-Auth", "token-123"));
+        final OpenSearchSinkConfig openSearchSinkConfig = getOpenSearchSinkConfigByConfigMetadata(metadata);
+        final ConnectionConfiguration connectionConfiguration =
+                ConnectionConfiguration.readConnectionConfiguration(openSearchSinkConfig);
+        final RestHighLevelClient client = connectionConfiguration.createClient(awsCredentialsSupplier);
+        assertNotNull(client);
+        assertNotNull(connectionConfiguration.createOpenSearchClient(client, awsCredentialsSupplier));
+        client.close();
+    }
+
+    @Test
+    void testCreateAllClients_WithPathPrefixAndRequestHeaders() throws IOException {
+        final Map<String, Object> metadata = generateConfigurationMetadata(
+                TEST_HOSTS, TEST_USERNAME, TEST_PASSWORD, TEST_CONNECT_TIMEOUT, TEST_SOCKET_TIMEOUT, false, null, null, TEST_CERT_PATH, false);
+        metadata.put("path_prefix", "/reverse-proxy/opensearch");
+        metadata.put("request_headers", Map.of("X-Proxy-Auth", "token-123", "X-Tenant", "my-tenant"));
+        final OpenSearchSinkConfig openSearchSinkConfig = getOpenSearchSinkConfigByConfigMetadata(metadata);
+        final ConnectionConfiguration connectionConfiguration =
+                ConnectionConfiguration.readConnectionConfiguration(openSearchSinkConfig);
+        assertEquals("/reverse-proxy/opensearch", connectionConfiguration.getPathPrefix());
+        assertEquals(2, connectionConfiguration.getRequestHeaders().size());
+        final RestHighLevelClient client = connectionConfiguration.createClient(awsCredentialsSupplier);
+        assertNotNull(client);
+        assertNotNull(connectionConfiguration.createOpenSearchClient(client, awsCredentialsSupplier));
+        client.close();
+    }
+
+    @Test
+    void testReadConnectionConfiguration_NullPathPrefixByDefault() throws JsonProcessingException {
+        final OpenSearchSinkConfig openSearchSinkConfig = generateOpenSearchSinkConfig(
+                TEST_HOSTS, null, null, null, null, false, null, null, null, false);
+        final ConnectionConfiguration connectionConfiguration =
+                ConnectionConfiguration.readConnectionConfiguration(openSearchSinkConfig);
+        assertNull(connectionConfiguration.getPathPrefix());
+    }
+
+    @Test
+    void testReadConnectionConfiguration_NullRequestHeadersByDefault() throws JsonProcessingException {
+        final OpenSearchSinkConfig openSearchSinkConfig = generateOpenSearchSinkConfig(
+                TEST_HOSTS, null, null, null, null, false, null, null, null, false);
+        final ConnectionConfiguration connectionConfiguration =
+                ConnectionConfiguration.readConnectionConfiguration(openSearchSinkConfig);
+        assertNull(connectionConfiguration.getRequestHeaders());
+    }
+
+    @Test
+    void testConnectionConfigurationBuilder_WithPathPrefix() throws IOException {
+        final ConnectionConfiguration.Builder builder = new ConnectionConfiguration.Builder(TEST_HOSTS);
+        builder.withPathPrefix("/opensearch");
+        final ConnectionConfiguration connectionConfiguration = builder.build();
+        assertEquals("/opensearch", connectionConfiguration.getPathPrefix());
+        final RestHighLevelClient client = connectionConfiguration.createClient(awsCredentialsSupplier);
+        assertNotNull(client);
+        client.close();
+    }
+
+    @Test
+    void testConnectionConfigurationBuilder_WithRequestHeaders() throws IOException {
+        final ConnectionConfiguration.Builder builder = new ConnectionConfiguration.Builder(TEST_HOSTS);
+        builder.withRequestHeaders(Map.of("X-Custom", "value"));
+        final ConnectionConfiguration connectionConfiguration = builder.build();
+        assertEquals(Map.of("X-Custom", "value"), connectionConfiguration.getRequestHeaders());
+        final RestHighLevelClient client = connectionConfiguration.createClient(awsCredentialsSupplier);
+        assertNotNull(client);
+        client.close();
+    }
     
     private OpenSearchSinkConfig generateOpenSearchSinkConfig(
             final List<String> hosts, final String username, final String password,

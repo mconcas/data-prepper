@@ -76,6 +76,14 @@ public class OpenSearchSinkConfig {
     private String proxy = null;
 
     @Getter
+    @JsonProperty("path_prefix")
+    private String pathPrefix = null;
+
+    @Getter
+    @JsonProperty("request_headers")
+    private Map<String, String> requestHeaders = null;
+
+    @Getter
     @JsonProperty("distribution_version")
     private String distributionVersion = DistributionVersion.DEFAULT.getVersion();
 
